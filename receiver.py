@@ -2,10 +2,11 @@ import socketio
 import asyncio
 import logging
 import threading
+import ast
 
 log = logging.getLogger(__name__)
 
-SERVER_ADDRESS = "http://localhost:4000"
+SERVER_ADDRESS = "http://192.168.1.41:4000"
 FUNCTIONS = {} # an external program will add functions into this dictionary
 
 sio = socketio.AsyncClient(reconnection=True,reconnection_attempts=0,reconnection_delay=1)
@@ -27,10 +28,11 @@ async def message(data):
 async def inbound_packet(data):
     try:
         log.debug(data)
-        if isinstance(data, dict):
+        packet = ast.literal_eval(data)
+        if isinstance(packet, dict):
             # validate the packet to make sure it's actually a 4pkt packet and not garbage
-            function = data.get("function", None)
-            args = data.get("args", [])
+            function = packet.get("function", None)
+            args = packet.get("args", [])
             if not function:
                 log.warning(f"Received invalid packet.")
             else:
@@ -45,6 +47,8 @@ async def inbound_packet(data):
                         log.warning(f"{function} was defined in FUNCTIONS dict but was not callable!")
                 else:
                     log.warning(f"No function defined for {function}.")
+        else:
+            log.warning(f"Data was not formatted as dict?")
     except:
         log.error(f"Unhandled exception while receiving packet.", exc_info=True)
 
