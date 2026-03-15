@@ -6,7 +6,7 @@ import ast
 
 log = logging.getLogger(__name__)
 
-SERVER_ADDRESS = "http://192.168.1.41:4000"
+SERVER_ADDRESS = "http://localhost:4000" # let external import redefine this
 FUNCTIONS = {} # an external program will add functions into this dictionary
 
 sio = socketio.AsyncClient(reconnection=True,reconnection_attempts=0,reconnection_delay=1)
