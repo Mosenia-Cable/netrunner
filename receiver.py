@@ -8,6 +8,7 @@ log = logging.getLogger(__name__)
 
 SERVER_ADDRESS = "http://localhost:4000" # let external import redefine this
 FUNCTIONS = {} # an external program will add functions into this dictionary
+DEFAULT_FUNCTION = None # external program can "catch all" with whatever function is set here
 
 sio = socketio.AsyncClient(reconnection=True,reconnection_attempts=0,reconnection_delay=1)
 
@@ -37,7 +38,7 @@ async def inbound_packet(data):
                 log.warning(f"Received invalid packet.")
             else:
                 log.debug(f"Received valid packet. {function}, args={args}")
-                target_function = FUNCTIONS.get(function, None)
+                target_function = FUNCTIONS.get(function, DEFAULT_FUNCTION) # fall back to a default function, if that has been set
                 if target_function:
                     if callable(target_function):
                         # this gonna be threaded cus uh god knows what people will do with this
