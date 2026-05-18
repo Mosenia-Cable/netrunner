@@ -1,8 +1,10 @@
+import asyncio
 import socketio
 import json
 import logging, coloredlogs
 import os
 from watchfiles import awatch
+import time
 
 log = logging.getLogger("netrunner server")
 log.setLevel(logging.DEBUG)
@@ -10,6 +12,7 @@ coloredlogs.install(level="DEBUG", logger=log)
 
 sio = socketio.AsyncServer(cors_allowed_origins='*', async_mode='asgi')  # For cross-origin
 app = socketio.ASGIApp(sio)
+
 
 def clear_outbox_cache():
     with open("outboxes.conf", "r") as conf_f:
@@ -42,6 +45,31 @@ async def send_packet(packet:dict):
     #log.debug(socketmessage)
     await sio.emit(data=str(socketmessage),event='inbound_packet')
     log.info(f"Sent socket packet: {socketmessage}")
+
+@sio.start_background_task
+async def heartbeats():
+    try:
+        with open("misc.conf", "r") as misc_f:
+            config = json.load(misc_f)
+            misc_f.close()
+        heartbeat_settings = config.get("ts_heartbeats", {})
+        enabled = heartbeat_settings.get("enabled", False)
+        frequency_seconds = heartbeat_settings.get("frequency", 60)
+        if enabled:
+            log.debug(f"Timestamp heartbeats are enabled, beginning background task to write heartbeats every {frequency_seconds} seconds.")
+            i = 0
+            while True:
+                i += 1
+                packet = {
+                    "function": "HEARTBEAT",
+                    "args": [time.time()] # write the time here for as little cycle latency as possible
+                }
+                await send_packet(packet=packet)
+                log.debug(f"Sent HEARTBEAT packet. (Packet no. {i})")
+                await asyncio.sleep(frequency_seconds) # asyncio needed to not hold main thread
+    except:
+        log.error(f"Failed to check miscellaneous configuration.")
+        
 
 @sio.start_background_task
 async def outbox_watcher():
