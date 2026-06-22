@@ -13,6 +13,7 @@ coloredlogs.install(level="DEBUG", logger=log)
 sio = socketio.AsyncServer(cors_allowed_origins='*', async_mode='asgi')  # For cross-origin
 app = socketio.ASGIApp(sio)
 
+TASKS_RUNNING = False
 
 def clear_outbox_cache():
     with open("outboxes.conf", "r") as conf_f:
@@ -31,6 +32,12 @@ def clear_outbox_cache():
 @sio.event
 async def connect(sid, environ, auth):
     log.info(f"Client connected: {sid}")
+    global TASKS_RUNNING
+    if TASKS_RUNNING == False:
+        log.debug(f"First client connected, starting background tasks")
+        sio.start_background_task(heartbeats)
+        sio.start_background_task(outbox_watcher)
+        TASKS_RUNNING = True
     
 @sio.event
 async def disconnect(sid):
@@ -46,8 +53,8 @@ async def send_packet(packet:dict):
     await sio.emit(data=str(socketmessage),event='inbound_packet')
     log.info(f"Sent socket packet: {socketmessage}")
 
-@sio.start_background_task
 async def heartbeats():
+    log.debug(f"Starting heartbeats task.")
     try:
         with open("misc.conf", "r") as misc_f:
             config = json.load(misc_f)
@@ -71,7 +78,6 @@ async def heartbeats():
         log.error(f"Failed to check miscellaneous configuration.")
         
 
-@sio.start_background_task
 async def outbox_watcher():
 
     with open("outboxes.conf", "r") as conf_f:
